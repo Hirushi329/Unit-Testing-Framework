@@ -1,4 +1,4 @@
-package org.wso2.sample5;
+package org.wso2.SynapseUnitTestAgent;
 
 import org.apache.synapse.MessageContext;
 import org.apache.synapse.mediators.AbstractMediator;
@@ -21,12 +21,11 @@ public class SimpleClassMediator extends AbstractMediator {
     }
 
     public boolean mediate(MessageContext mc) {
+        Agent agent = new Agent();
         try {
-            String[] args = {};
-            TCPServer.main(args);
-        }catch (ClassNotFoundException e) {
-        }catch (IOException e){
-
+            agent.initialize();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
 
         return true;

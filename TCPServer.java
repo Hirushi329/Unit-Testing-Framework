@@ -1,62 +1,78 @@
-package org.wso2.sample5;
+/*
+ * Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ *
+ * WSO2 Inc. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.wso2.SynapseUnitTestAgent;
 
-import org.json.simple.JSONObject;
-import org.wso2.sample5.Agent;
-import org.wso2.sample5.Deployer;
+import org.apache.log4j.Logger;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.lang.ClassNotFoundException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 
 public class TCPServer {
-    private static ServerSocket server;
-    private static int port = 9876;
 
     /**
-     * Method responsible for obtaining data from the client
+     * Class responsible for initializing a socket, reading and writing data to the socket
      */
-    public static void main(String args[]) throws IOException, ClassNotFoundException {
-        server = new ServerSocket(port);
-        while (true) {
-            System.out.println("Waiting for client request");
-            Socket socket = server.accept();
 
-            ObjectInputStream objectInputStream = new ObjectInputStream(socket.getInputStream());
-            JSONObject jsonObject = null;
-            jsonObject = (JSONObject) objectInputStream.readObject();
-            System.out.println("Message Received: " + jsonObject);
+    private static ServerSocket serverSocket;
+    private static Socket clientSocket;
 
+    private static PrintWriter printWriter;
+    private static BufferedReader bufferedReader;
+    static Logger log = Logger.getLogger(TCPServer.class.getName());
 
-            JSONObject json = new JSONObject(jsonObject);
-            String inputXmlPayload = json.get("inputXmlPayload").toString();
-            String artifactId = json.get("artifactId").toString();
-            String fileName = json.get("fileName").toString();
-            String properties = json.get("properties").toString();
-            String expectedPropVal = json.get("expectedPropVal").toString();
-            String expectedPayload = json.get("expectedPayload").toString();
+    public TCPServer() {
 
-            try {
-                new Deployer().deploy(artifactId, fileName, properties);
-                new Agent().createMessageContext(inputXmlPayload);
-                new Agent().sequenceMediate(inputXmlPayload);
-                String result = new Agent().doAssertions(expectedPayload, expectedPropVal, inputXmlPayload);
+        try {
+            serverSocket = new ServerSocket(6666);
+            clientSocket = serverSocket.accept();
+            log.info("Connection established");
+        } catch (IOException e) {
+            log.error("Exception in initializing the socket", e);
+        }
+    }
 
-            ObjectOutputStream objectOutputStream = new ObjectOutputStream(socket.getOutputStream());
-            objectOutputStream.writeObject("Unit testing result:" + result);
+    public void readData(Agent agent) {
 
-            objectInputStream.close();
-            objectInputStream.close();
-            socket.close();
-        }catch( Exception e){
+        try {
+            log.info("Waiting for the client");
+            printWriter = new PrintWriter(clientSocket.getOutputStream(), true);
+            bufferedReader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
+            String message = bufferedReader.readLine();
+            while (message != null) {
+                log.info("Message received:" + message);
+                agent.executeTest(message);
+                message = bufferedReader.readLine();
+            }
+
+        } catch (IOException e) {
+            log.error("IOException", e);
+
         }
 
-            if (jsonObject != null) break;
-        }
-        System.out.println("Shutting down the server!!");
+    }
 
-        server.close();
+    public void writeData(String result) {
+
+        printWriter.println(result);
+        log.info("Result sent");
     }
 }
