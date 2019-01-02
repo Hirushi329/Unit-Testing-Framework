@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+ Copyright (c) 2017, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
  *
  * WSO2 Inc. licenses this file to you under the Apache License,
  * Version 2.0 (the "License"); you may not use this file except
@@ -15,57 +15,44 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.wso2.SynapseUnitTestAgent;
+package org.wso2.SynapseUnitTestClient;
 
-import org.apache.synapse.MessageContext;
-import org.apache.synapse.mediators.base.SequenceMediator;
+import org.apache.log4j.BasicConfigurator;
+import org.apache.log4j.Logger;
 
 /**
- * Class responsible for building message context and mediating the message context through the deployed sequence and asserting the mediation result
+ * Class responsible for initializing the test framework
  */
 public class TestExecutor {
 
-    /**
-     * Create message context from the inputXmlPayload
-     */
-    public MessageContext createMessageContext(String inputXmlPayload) {
+    private static Logger log = Logger.getLogger(TestExecutor.class.getName());
 
-        MessageContext msgCtxt = null;
+    public static void main(String[] args) {
 
-        try {
-            msgCtxt = TestUtils.createLightweightSynapseMessageContext(inputXmlPayload);
+        String descriptorFilePath = args[0];
+        String synapseHost = args[1];
+        String port = args[2];
 
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return msgCtxt;
-    }
+        DescriptorFileReader descriptorFileReader = new DescriptorFileReader();
+        TestDataHolder uniTestDataHolder = descriptorFileReader.parseFile(descriptorFilePath);
+        TCPClient tcpClient = new TCPClient(synapseHost, port);
 
-    /**
-     * Mediate the message through the given sequence
-     */
-    public void sequenceMediate(String inputXmlPayload) {
+        String deploymentMessage = MessageFormatUtils.generateDeployMessage(uniTestDataHolder);
+        String result = tcpClient.writeData(deploymentMessage);
+        String message = MessageFormatUtils.getResultMessage(result);
 
-        SequenceMediator sequenceMediator = new SequenceMediator();
-        sequenceMediator.mediate(createMessageContext(inputXmlPayload));
-    }
+        if (message.equals("Sequence is deployed successfully")) {
 
-    /**
-     * Asserting the payload and property values
-     */
-    public String doAssertions(String expectedPayload, String expectedPropVal, String inputXmlPayload) {
-
-        MessageContext msgCtxt = createMessageContext(inputXmlPayload);
-
-        boolean result1 = (expectedPropVal.equals(msgCtxt.getEnvelope().toString()));
-
-        boolean result2 = (expectedPayload.equals(msgCtxt.getEnvelope().getBody().toString()));
-
-        if (result1 && result2) {
-            return  "Unit Testing is Successful";
-        } else {
-            return  "Unit testing failed";
-        }
-
+            String testDataMessage = MessageFormatUtils.generateTestDataMessage(uniTestDataHolder);
+            log.info("Sending test data:" + testDataMessage);
+            String unitTestResult = tcpClient.writeData(testDataMessage);
+            String finalResult = MessageFormatUtils.getResultMessage(unitTestResult);
+            log.info("Unit Test Result is:" + finalResult);
+        } else if (result.equals("Sequence is not deployed")) {
+            log.info("Sequence not deployed");
+        } else log.info("Deployment result not received");
     }
 }
+
+
+
